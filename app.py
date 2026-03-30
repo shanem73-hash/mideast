@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+import os
 
 import pandas as pd
 import pydeck as pdk
@@ -41,20 +42,32 @@ with st.sidebar:
     days_back = st.slider("News lookback (days)", 3, 45, 14)
     top_k = st.slider("Hotspots from news", 1, 10, 6)
     auto_btn = st.button("Auto-detect hotspots from news")
+    reset_aoi_btn = st.button("Reset AOIs to config")
 
     run_btn = st.button("Run analysis", type="primary")
 
+if reset_aoi_btn:
+    st.session_state.current_aois = cfg["aois"]
+    st.info("AOIs reset to config defaults.")
+
 if auto_btn:
-    with st.spinner("Retrieving recent news hotspots..."):
-        hs = auto_hotspots(days_back=days_back, top_k=top_k)
-    if hs:
-        st.session_state.current_aois = [
-            {"name": h.name, "center": [float(h.lon), float(h.lat)], "half_size_deg": 0.10}
-            for h in hs
-        ]
-        st.success(f"Loaded {len(hs)} hotspot AOIs from news guidance.")
-    else:
-        st.warning("No hotspots found from news feed; keeping existing AOIs.")
+    try:
+        with st.spinner("Retrieving recent news hotspots..."):
+            hs = auto_hotspots(days_back=days_back, top_k=top_k)
+        if hs:
+            st.session_state.current_aois = [
+                {"name": h.name, "center": [float(h.lon), float(h.lat)], "half_size_deg": 0.10}
+                for h in hs
+            ]
+            st.success(f"Loaded {len(hs)} hotspot AOIs from news guidance.")
+        else:
+            st.warning("No hotspots found from news feed; keeping existing AOIs.")
+    except Exception as e:
+        st.error(f"Hotspot auto-detection failed: {e}")
+
+if not (baseline_start <= baseline_end and recent_start <= recent_end):
+    st.error("Date ranges are invalid. Please fix start/end dates.")
+    st.stop()
 
 # AOI map
 rows = []
@@ -96,14 +109,21 @@ if run_btn:
     cfg_run["cloud_cover_max"] = int(cloud_cover_max)
     cfg_run["max_items_per_window"] = int(max_items)
 
-    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
-        yaml.safe_dump(cfg_run, tf)
-        run_cfg = tf.name
+    run_cfg = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tf:
+            yaml.safe_dump(cfg_run, tf)
+            run_cfg = tf.name
 
-    with st.spinner("Running Sentinel analysis... this may take a while."):
-        run(run_cfg)
+        with st.spinner("Running Sentinel analysis... this may take a while."):
+            run(run_cfg)
 
-    st.success("Analysis completed.")
+        st.success("Analysis completed.")
+    except Exception as e:
+        st.error(f"Analysis failed: {e}")
+    finally:
+        if run_cfg and os.path.exists(run_cfg):
+            os.remove(run_cfg)
 
 out_dir = Path(cfg.get("out_dir", "outputs"))
 summary_csv = out_dir / "summary.csv"
@@ -112,6 +132,16 @@ st.subheader("Results")
 if summary_csv.exists():
     df = pd.read_csv(summary_csv)
     st.dataframe(df, use_container_width=True)
+    cdl1, cdl2 = st.columns(2)
+    cdl1.download_button("Download summary.csv", data=summary_csv.read_bytes(), file_name="summary.csv", mime="text/csv")
+    summary_json = out_dir / "summary.json"
+    if summary_json.exists():
+        cdl2.download_button(
+            "Download summary.json",
+            data=summary_json.read_bytes(),
+            file_name="summary.json",
+            mime="application/json",
+        )
 else:
     st.info("No summary yet. Click 'Run analysis'.")
 
