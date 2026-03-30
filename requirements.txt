@@ -16,3 +16,4 @@ pyyaml
 jupyter
 streamlit
 pydeck
+requests

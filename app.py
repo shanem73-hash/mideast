@@ -9,6 +9,7 @@ import streamlit as st
 import yaml
 
 from mideast_sentinel_analysis import run
+from news_hotspots import auto_hotspots
 
 st.set_page_config(page_title="Mideast Sentinel Lab", page_icon="🛰️", layout="wide")
 st.title("🛰️ Mideast Sentinel Lab")
@@ -23,6 +24,8 @@ def load_cfg() -> dict:
 
 
 cfg = load_cfg()
+if "current_aois" not in st.session_state:
+    st.session_state.current_aois = cfg["aois"]
 
 with st.sidebar:
     st.header("Run settings")
@@ -33,11 +36,29 @@ with st.sidebar:
     cloud_cover_max = st.slider("Max cloud cover (S2)", 0, 100, int(cfg.get("cloud_cover_max", 30)))
     max_items = st.slider("Max scenes per window", 2, 20, int(cfg.get("max_items_per_window", 8)))
 
+    st.markdown("---")
+    st.subheader("News-guided hotspots")
+    days_back = st.slider("News lookback (days)", 3, 45, 14)
+    top_k = st.slider("Hotspots from news", 1, 10, 6)
+    auto_btn = st.button("Auto-detect hotspots from news")
+
     run_btn = st.button("Run analysis", type="primary")
+
+if auto_btn:
+    with st.spinner("Retrieving recent news hotspots..."):
+        hs = auto_hotspots(days_back=days_back, top_k=top_k)
+    if hs:
+        st.session_state.current_aois = [
+            {"name": h.name, "center": [float(h.lon), float(h.lat)], "half_size_deg": 0.10}
+            for h in hs
+        ]
+        st.success(f"Loaded {len(hs)} hotspot AOIs from news guidance.")
+    else:
+        st.warning("No hotspots found from news feed; keeping existing AOIs.")
 
 # AOI map
 rows = []
-for a in cfg["aois"]:
+for a in st.session_state.current_aois:
     lon, lat = a["center"]
     rows.append({"name": a["name"], "lon": lon, "lat": lat})
 
@@ -64,8 +85,12 @@ st.pydeck_chart(
     )
 )
 
+st.caption(f"Active AOIs: {len(st.session_state.current_aois)}")
+st.dataframe(pd.DataFrame(rows), use_container_width=True, height=180)
+
 if run_btn:
     cfg_run = dict(cfg)
+    cfg_run["aois"] = st.session_state.current_aois
     cfg_run["baseline"] = {"start": str(baseline_start), "end": str(baseline_end)}
     cfg_run["recent"] = {"start": str(recent_start), "end": str(recent_end)}
     cfg_run["cloud_cover_max"] = int(cloud_cover_max)

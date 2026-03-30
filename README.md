@@ -37,6 +37,7 @@ streamlit run app.py
 The UI provides:
 - AOI map
 - baseline/recent date controls
+- **auto-detect hotspot AOIs from recent war-related news**
 - run button
 - summary table
 - interactive change-map layers (ΔNDVI / ΔNBR / ΔVV dB)
