@@ -1,0 +1,36 @@
+# Adjustable AOIs and dates for Sentinel-1/2 time-series analysis.
+# Coordinates are lon/lat in EPSG:4326.
+
+aois:
+  - name: tehran_west
+    center: [51.209, 35.689]
+    half_size_deg: 0.12
+  - name: isfahan_nuclear_corridor
+    center: [51.667, 32.654]
+    half_size_deg: 0.10
+  - name: kermanshah_west
+    center: [47.061, 34.314]
+    half_size_deg: 0.12
+  - name: tabriz_northwest
+    center: [46.291, 38.080]
+    half_size_deg: 0.12
+
+# Baseline and recent windows for change detection.
+baseline:
+  start: "2024-01-01"
+  end: "2024-12-31"
+recent:
+  start: "2026-01-01"
+  end: "2026-12-31"
+
+# Planetary Computer collections.
+collections:
+  sentinel2: "sentinel-2-l2a"
+  sentinel1: "sentinel-1-rtc"
+
+# Scene filtering.
+cloud_cover_max: 30
+max_items_per_window: 8
+
+# Output directory.
+out_dir: "outputs"
