@@ -90,6 +90,52 @@ if summary_csv.exists():
 else:
     st.info("No summary yet. Click 'Run analysis'.")
 
+st.subheader("Change map layers")
+map_dir = out_dir / "map_points"
+map_files = sorted(map_dir.glob("*.csv")) if map_dir.exists() else []
+if map_files:
+    df_map = pd.concat([pd.read_csv(f) for f in map_files], ignore_index=True)
+    c1, c2 = st.columns(2)
+    aoi_sel = c1.selectbox("AOI", sorted(df_map["aoi"].unique()))
+    metric_sel = c2.selectbox("Metric", sorted(df_map["metric"].unique()))
+    d = df_map[(df_map["aoi"] == aoi_sel) & (df_map["metric"] == metric_sel)].copy()
+
+    if not d.empty:
+        vmax = float(max(abs(d["value"].quantile(0.98)), 1e-6))
+
+        def to_color(v: float):
+            x = max(-1.0, min(1.0, v / vmax))
+            if x >= 0:
+                return [255, int(200 * (1 - x)), 0, 180]
+            return [0, int(200 * (1 + x)), 255, 180]
+
+        d["color"] = d["value"].apply(to_color)
+        d["radius"] = 1200
+
+        st.pydeck_chart(
+            pdk.Deck(
+                map_style="mapbox://styles/mapbox/dark-v11",
+                initial_view_state=pdk.ViewState(
+                    latitude=float(d["lat"].mean()), longitude=float(d["lon"].mean()), zoom=9
+                ),
+                layers=[
+                    pdk.Layer(
+                        "ScatterplotLayer",
+                        data=d,
+                        get_position="[lon, lat]",
+                        get_radius="radius",
+                        get_fill_color="color",
+                        pickable=True,
+                    )
+                ],
+                tooltip={"text": "{metric}\nvalue={value}"},
+            )
+        )
+    else:
+        st.info("No map points for selected AOI/metric.")
+else:
+    st.info("No map layers yet. Run analysis first.")
+
 st.subheader("Generated images")
 images = sorted(out_dir.glob("*.png")) if out_dir.exists() else []
 if not images:

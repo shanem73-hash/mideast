@@ -39,6 +39,7 @@ The UI provides:
 - baseline/recent date controls
 - run button
 - summary table
+- interactive change-map layers (ΔNDVI / ΔNBR / ΔVV dB)
 - generated image gallery
 
 Outputs:

@@ -55,7 +55,7 @@ def search_items(collection: str, bbox: List[float], start: str, end: str, max_i
 def load_s2_composite(items, bbox: List[float]) -> xr.Dataset | None:
     if not items:
         return None
-    ds = load(items, bands=["B04", "B08", "B12"], bbox=bbox, resolution=20)
+    ds = load(items, bands=["B04", "B08", "B12"], bbox=bbox, crs="EPSG:4326", resolution=0.0002)
     if ds.time.size == 0:
         return None
     return ds.median(dim="time", skipna=True)
@@ -64,7 +64,7 @@ def load_s2_composite(items, bbox: List[float]) -> xr.Dataset | None:
 def load_s1_composite(items, bbox: List[float]) -> xr.Dataset | None:
     if not items:
         return None
-    ds = load(items, bands=["vv", "vh"], bbox=bbox, resolution=20)
+    ds = load(items, bands=["vv", "vh"], bbox=bbox, crs="EPSG:4326", resolution=0.0002)
     if ds.time.size == 0:
         return None
     return ds.median(dim="time", skipna=True)
@@ -120,6 +120,33 @@ def diff_stats(a: xr.DataArray, b: xr.DataArray) -> dict:
         "p95": float(np.percentile(d, 95)),
         "p99": float(np.percentile(d, 99)),
     }
+
+
+def export_map_points(out_csv: Path, aoi_name: str, metric_name: str, da: xr.DataArray, stride: int = 6):
+    if "x" not in da.coords or "y" not in da.coords:
+        return
+    arr = da.values
+    ys = da["y"].values
+    xs = da["x"].values
+
+    rows = []
+    for iy in range(0, arr.shape[0], stride):
+        for ix in range(0, arr.shape[1], stride):
+            v = arr[iy, ix]
+            if not np.isfinite(v):
+                continue
+            rows.append(
+                {
+                    "aoi": aoi_name,
+                    "metric": metric_name,
+                    "lon": float(xs[ix]),
+                    "lat": float(ys[iy]),
+                    "value": float(v),
+                }
+            )
+
+    if rows:
+        pd.DataFrame(rows).to_csv(out_csv, index=False)
 
 
 def plot_panel(out_png: Path, title: str, layers: Dict[str, xr.DataArray]):
@@ -187,6 +214,12 @@ def run(config_path: str = "config.yaml"):
             f"{aoi.name} change metrics",
             {"delta_ndvi": delta_ndvi, "delta_nbr": delta_nbr, "delta_vv_db": delta_vv, "class": class_map},
         )
+
+        map_dir = out_dir / "map_points"
+        map_dir.mkdir(parents=True, exist_ok=True)
+        export_map_points(map_dir / f"{aoi.name}_delta_ndvi.csv", aoi.name, "delta_ndvi", delta_ndvi)
+        export_map_points(map_dir / f"{aoi.name}_delta_nbr.csv", aoi.name, "delta_nbr", delta_nbr)
+        export_map_points(map_dir / f"{aoi.name}_delta_vv_db.csv", aoi.name, "delta_vv_db", delta_vv)
 
         rec = {
             "aoi": aoi.name,
