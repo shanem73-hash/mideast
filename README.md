@@ -18,7 +18,7 @@ For each AOI in `config.yaml`:
 5. Compute change metrics (`delta_ndvi`, `delta_nbr`, `delta_vv_db`)
 6. Save maps and summary stats in `outputs/`
 
-## Quickstart
+## Quickstart (CLI)
 
 ```bash
 python -m venv .venv
@@ -26,6 +26,20 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python mideast_sentinel_analysis.py
 ```
+
+## Streamlit interface
+
+```bash
+source .venv/bin/activate
+streamlit run app.py
+```
+
+The UI provides:
+- AOI map
+- baseline/recent date controls
+- run button
+- summary table
+- generated image gallery
 
 Outputs:
 - `outputs/*_s2_baseline.png`
